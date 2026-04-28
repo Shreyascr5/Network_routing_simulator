@@ -1,20 +1,59 @@
-#ifndef GRAPH_H
-#define GRAPH_H
+#include "../include/Graph.h"
+#include <iostream>
 
-#include <bits/stdc++.h>
 using namespace std;
 
-class Graph
+Graph::Graph(int V)
 {
-public:
-    int V;
-    vector<vector<pair<int, int>>> adj;
+    this->V = V;
+    adj.resize(V);
+}
 
-    Graph(int V);
+void Graph::addEdge(int u, int v, int w)
+{
+    adj[u].push_back({v, w});
+    adj[v].push_back({u, w});
+}
 
-    void addEdge(int u, int v, int w);
-    void printGraph();
-    vector<int> dijkstra(int src);
-};
+void Graph::printGraph()
+{
+    for (int i = 0; i < V; i++)
+    {
+        cout << "Router " << i << " -> ";
+        for (auto &edge : adj[i])
+        {
+            cout << "(" << edge.first << ", cost=" << edge.second << ") ";
+        }
+        cout << endl;
+    }
+}
 
-#endif
+vector<int> Graph::dijkstra(int src)
+{
+    vector<int> dist(V, INT_MAX);
+
+    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
+
+    dist[src] = 0;
+    pq.push({0, src});
+
+    while (!pq.empty())
+    {
+        int u = pq.top().second;
+        pq.pop();
+
+        for (auto &edge : adj[u])
+        {
+            int v = edge.first;
+            int weight = edge.second;
+
+            if (dist[u] + weight < dist[v])
+            {
+                dist[v] = dist[u] + weight;
+                pq.push({dist[v], v});
+            }
+        }
+    }
+
+    return dist;
+}
