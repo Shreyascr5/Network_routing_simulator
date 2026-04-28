@@ -2,9 +2,7 @@
 #define GRAPH_H
 
 #include <vector>
-#include <utility> // for pair
-#include <queue>
-#include <climits>
+#include <utility>
 
 class Graph
 {
@@ -15,8 +13,11 @@ public:
     Graph(int V);
 
     void addEdge(int u, int v, int w);
+    void removeEdge(int u, int v);
     void printGraph();
-    std::vector<int> dijkstra(int src);
+
+    std::vector<int> dijkstra(int src, std::vector<int> &parent);
+    std::vector<int> getPath(int dest, std::vector<int> &parent);
 };
 
 #endif
