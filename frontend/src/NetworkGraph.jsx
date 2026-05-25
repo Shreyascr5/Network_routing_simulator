@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import {
-  ReactFlow
-} from "@xyflow/react";
+import { ReactFlow } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 
@@ -12,9 +10,11 @@ export default function NetworkGraph() {
 
   const [edges, setEdges] = useState([]);
 
+  const [rawEdges, setRawEdges] = useState([]);
+
   const [selected, setSelected] = useState([]);
 
-  const [rawEdges, setRawEdges] = useState([]);
+  const [packetNode, setPacketNode] = useState(null);
 
   useEffect(() => {
 
@@ -27,32 +27,31 @@ export default function NetworkGraph() {
         setRawEdges(data.edges);
 
         const visualNodes =
-          data.nodes.map((n, index) => ({
+          data.nodes.map((n,index)=>({
 
-            id: n.id,
+            id:n.id,
 
-            position: {
-              x: index * 150,
-              y: 100
+            position:{
+              x:index*180,
+              y:150
             },
 
-            data: {
-              label: n.label
+            data:{
+              label:n.label
             }
 
           }));
 
         const visualEdges =
-          data.edges.map((e, index) => ({
+          data.edges.map((e,index)=>({
 
-            id: "e" + index,
+            id:"e"+index,
 
-            source: e.source,
+            source:e.source,
 
-            target: e.target,
+            target:e.target,
 
-            label: e.label
-
+            label:e.label
           }));
 
         setNodes(visualNodes);
@@ -61,87 +60,164 @@ export default function NetworkGraph() {
 
       });
 
-  }, []);
+  },[]);
 
-  function runDijkstra(source, destination) {
+  async function animatePacket(path){
 
-    let adj = {};
+    for(let node of path){
 
-    rawEdges.forEach(e => {
+      setPacketNode(node);
 
-      if (!adj[e.source])
-        adj[e.source] = [];
+      await new Promise(
+        r=>setTimeout(r,1000)
+      );
 
-      if (!adj[e.target])
-        adj[e.target] = [];
+    }
+
+  }
+
+  function highlightPath(path){
+
+    const newEdges=
+      edges.map(e=>{
+
+        let active=false;
+
+        for(
+          let i=0;
+          i<path.length-1;
+          i++
+        ){
+
+          let a=path[i];
+
+          let b=path[i+1];
+
+          if(
+
+            (e.source===a &&
+             e.target===b)
+
+            ||
+
+            (e.source===b &&
+             e.target===a)
+
+          ){
+
+            active=true;
+
+          }
+
+        }
+
+        return{
+
+          ...e,
+
+          animated:active,
+
+          style:active?
+
+          {
+            stroke:"red",
+            strokeWidth:4
+          }
+
+          :{}
+
+        };
+
+      });
+
+    setEdges(newEdges);
+
+    animatePacket(path);
+
+  }
+
+  function runDijkstra(source,destination){
+
+    let adj={};
+
+    rawEdges.forEach(e=>{
+
+      if(!adj[e.source])
+        adj[e.source]=[];
+
+      if(!adj[e.target])
+        adj[e.target]=[];
 
       adj[e.source].push({
-        node: e.target,
-        weight: Number(e.label)
+        node:e.target,
+        weight:Number(e.label)
       });
 
       adj[e.target].push({
-        node: e.source,
-        weight: Number(e.label)
+        node:e.source,
+        weight:Number(e.label)
       });
 
     });
 
-    let dist = {};
+    let dist={};
 
-    let parent = {};
+    let parent={};
 
-    nodes.forEach(n => {
+    nodes.forEach(n=>{
 
-      dist[n.id] = Infinity;
+      dist[n.id]=Infinity;
 
-      parent[n.id] = null;
+      parent[n.id]=null;
 
     });
 
-    dist[source] = 0;
+    dist[source]=0;
 
-    let pq = [[0, source]];
+    let pq=[[0,source]];
 
-    while (pq.length > 0) {
+    while(pq.length){
 
-      pq.sort((a, b) => a[0] - b[0]);
+      pq.sort(
+        (a,b)=>a[0]-b[0]
+      );
 
-      let [d, u] = pq.shift();
+      let [d,u]=pq.shift();
 
-      if (!adj[u])
-        continue;
+      if(!adj[u]) continue;
 
-      adj[u].forEach(v => {
+      adj[u].forEach(v=>{
 
-        let nd =
-          d + v.weight;
+        let nd=d+v.weight;
 
-        if (nd < dist[v.node]) {
+        if(
+          nd<dist[v.node]
+        ){
 
-          dist[v.node] = nd;
+          dist[v.node]=nd;
 
-          parent[v.node] = u;
+          parent[v.node]=u;
 
           pq.push([
             nd,
             v.node
           ]);
+
         }
 
       });
 
     }
 
-    let path = [];
+    let path=[];
 
-    let cur = destination;
+    let cur=destination;
 
-    while (cur !== null) {
+    while(cur!==null){
 
       path.push(cur);
 
-      cur = parent[cur];
+      cur=parent[cur];
 
     }
 
@@ -151,77 +227,23 @@ export default function NetworkGraph() {
 
   }
 
-  function highlightPath(path) {
+  function handleNodeClick(
+    event,
+    node
+  ){
 
-    const newEdges =
-      edges.map(e => {
+    let next=[
+      ...selected
+    ];
 
-        let active = false;
-
-        for (
-          let i = 0;
-          i < path.length - 1;
-          i++
-        ) {
-
-          let a = path[i];
-
-          let b = path[i + 1];
-
-          if (
-
-            (e.source === a &&
-              e.target === b)
-
-            ||
-
-            (e.source === b &&
-              e.target === a)
-
-          ) {
-
-            active = true;
-
-          }
-
-        }
-
-        return {
-
-          ...e,
-
-          animated: active,
-
-          style: active ?
-
-            {
-              stroke: "red",
-              strokeWidth: 4
-            }
-
-            : {}
-
-        };
-
-      });
-
-    setEdges(newEdges);
-
-  }
-
-  function handleNodeClick(event, node) {
-
-    let next =
-      [...selected];
-
-    if (next.length === 2)
-      next = [];
+    if(next.length===2)
+      next=[];
 
     next.push(node.id);
 
     setSelected(next);
 
-    if (next.length === 2) {
+    if(next.length===2){
 
       runDijkstra(
         next[0],
@@ -232,24 +254,46 @@ export default function NetworkGraph() {
 
   }
 
-  return (
+  const animatedNodes=
+    nodes.map(n=>({
+
+      ...n,
+
+      data:{
+
+        label:
+          packetNode===n.id
+
+          ?
+
+          `📦 ${n.data.label}`
+
+          :
+
+          n.data.label
+
+      }
+
+    }));
+
+  return(
 
     <div
       style={{
-        width: "100vw",
-        height: "100vh"
+        width:"100vw",
+        height:"100vh"
       }}
     >
 
       <div
         style={{
-          position: "absolute",
+          position:"absolute",
 
-          zIndex: 10,
+          zIndex:10,
 
-          background: "white",
+          background:"white",
 
-          padding: "10px"
+          padding:"10px"
         }}
       >
 
@@ -263,7 +307,9 @@ export default function NetworkGraph() {
 
       <ReactFlow
 
-        nodes={nodes}
+        nodes={
+          animatedNodes
+        }
 
         edges={edges}
 
