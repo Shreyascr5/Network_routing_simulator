@@ -1,82 +1,144 @@
 #include "../include/Graph.h"
 #include <iostream>
+#include <climits>
 
 using namespace std;
 
-int main()
+void simulatePacket(Graph &g, int source, int destination)
 {
-    Graph g(5);
-
-    g.addEdge(0, 1, 10);
-    g.addEdge(0, 2, 5);
-    g.addEdge(1, 3, 2);
-    g.addEdge(2, 3, 3);
-    g.addEdge(3, 4, 1);
-
-    cout << "Network Topology:\n";
-    g.printGraph();
-
     vector<int> parent;
-    vector<int> dist = g.dijkstra(0, parent);
+    vector<int> dist = g.dijkstra(source, parent);
 
-    int destination = 4;
-
-    cout << "\nShortest distance: " << dist[destination] << endl;
+    // no route exists
+    if (destination >= g.V || dist[destination] == INT_MAX)
+    {
+        cout << "\nNo route available\n";
+        cout << "Packet dropped ❌\n";
+        return;
+    }
 
     vector<int> path = g.getPath(destination, parent);
 
+    cout << "\nShortest Distance = "
+         << dist[destination] << endl;
+
     cout << "Path: ";
+
     for (int node : path)
         cout << node << " ";
-    cout << endl;
 
-    cout << "\nSimulating Packet Routing:\n";
+    cout << "\n\nPacket Simulation:\n";
 
     for (int i = 0; i < path.size(); i++)
     {
-        cout << "Packet at Router " << path[i] << endl;
+        cout << "Packet at Router "
+             << path[i] << endl;
 
         if (i != path.size() - 1)
         {
-            cout << "→ moving to Router " << path[i + 1] << endl;
+            cout << "-> moving to Router "
+                 << path[i + 1]
+                 << endl;
         }
     }
 
-    cout << "Packet delivered successfully ✅\n";
+    cout << "Packet Delivered ✅\n";
+}
 
-    // 🔥 LINK FAILURE SIMULATION
-    cout << "\n--- Simulating Link Failure (2 - 3) ---\n";
+int main()
+{
+    int routers, edges;
 
-    g.removeEdge(2, 3);
+    cout << "Enter number of routers: ";
+    cin >> routers;
 
-    cout << "\nUpdated Network:\n";
-    g.printGraph();
+    Graph g(routers);
 
-    vector<int> parent2;
-    vector<int> dist2 = g.dijkstra(0, parent2);
+    cout << "Enter number of links: ";
+    cin >> edges;
 
-    vector<int> newPath = g.getPath(destination, parent2);
+    cout << "\nFormat: source destination cost\n";
 
-    cout << "\nNew shortest distance: " << dist2[destination] << endl;
-
-    cout << "New Path: ";
-    for (int node : newPath)
-        cout << node << " ";
-    cout << endl;
-
-    cout << "\nRe-routing Packet:\n";
-
-    for (int i = 0; i < newPath.size(); i++)
+    for (int i = 0; i < edges; i++)
     {
-        cout << "Packet at Router " << newPath[i] << endl;
+        int u, v, w;
+        cin >> u >> v >> w;
 
-        if (i != newPath.size() - 1)
-        {
-            cout << "→ moving to Router " << newPath[i + 1] << endl;
-        }
+        g.addEdge(u, v, w);
     }
 
-    cout << "Packet delivered after rerouting ✅\n";
+    int choice;
+
+    do
+    {
+        cout << "\n========== NETWORK MENU ==========\n";
+        cout << "1. Show topology\n";
+        cout << "2. Route packet\n";
+        cout << "3. Remove link\n";
+        cout << "4. Add link\n";
+        cout << "5. Exit\n";
+
+        cin >> choice;
+
+        switch (choice)
+        {
+
+        case 1:
+            g.printGraph();
+            break;
+
+        case 2:
+        {
+            int s, d;
+
+            cout << "Source: ";
+            cin >> s;
+
+            cout << "Destination: ";
+            cin >> d;
+
+            simulatePacket(g, s, d);
+
+            break;
+        }
+
+        case 3:
+        {
+            int u, v;
+
+            cout << "Remove edge (u v): ";
+            cin >> u >> v;
+
+            g.removeEdge(u, v);
+
+            cout << "Link removed\n";
+
+            break;
+        }
+
+        case 4:
+        {
+            int u, v, w;
+
+            cout << "Add edge (u v cost): ";
+            cin >> u >> v >> w;
+
+            g.addEdge(u, v, w);
+
+            cout << "Link added\n";
+
+            break;
+        }
+
+        case 5:
+            cout << "Exiting...\n";
+            break;
+
+        default:
+            cout << "Invalid choice\n";
+        }
+
+    } while (choice != 5);
 
     return 0;
 }
