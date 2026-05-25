@@ -1,0 +1,15 @@
+{
+"nodes": [
+{"id":"0","label":"Router 0"},
+{"id":"1","label":"Router 1"},
+{"id":"2","label":"Router 2"},
+{"id":"3","label":"Router 3"},
+{"id":"4","label":"Router 4"}
+],
+"edges": [
+{"source":"0","target":"1","label":"2"},
+{"source":"0","target":"4","label":"10"},
+{"source":"1","target":"2","label":"1"},
+{"source":"2","target":"4","label":"1"}
+]
+}
