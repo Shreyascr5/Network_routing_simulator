@@ -1,328 +1,755 @@
 import React, { useEffect, useState } from "react";
 
-import { ReactFlow } from "@xyflow/react";
+import dagre from "dagre";
+
+import {
+  ReactFlow,
+  Controls,
+  MiniMap,
+  Background
+} from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 
 export default function NetworkGraph() {
 
-  const [nodes, setNodes] = useState([]);
+const [nodes,setNodes]=useState([]);
+const [edges,setEdges]=useState([]);
+const [rawEdges,setRawEdges]=useState([]);
 
-  const [edges, setEdges] = useState([]);
+const [packetNode,setPacketNode]=useState(null);
 
-  const [rawEdges, setRawEdges] = useState([]);
+const [source,setSource]=useState("");
+const [destination,setDestination]=useState("");
 
-  const [selected, setSelected] = useState([]);
+const [route,setRoute]=useState([]);
+const [distance,setDistance]=useState("-");
 
-  const [packetNode, setPacketNode] = useState(null);
+const [failedEdge,setFailedEdge]=useState("");
 
-  useEffect(() => {
+useEffect(()=>{
+loadGraph();
+},[]);
 
-    fetch("/network.json")
+function layoutGraph(nodes,edges){
 
-      .then(r => r.json())
+const g=
+new dagre.graphlib.Graph();
 
-      .then(data => {
+g.setGraph({
 
-        setRawEdges(data.edges);
+rankdir:"LR",
 
-        const visualNodes =
-          data.nodes.map((n,index)=>({
+nodesep:120,
 
-            id:n.id,
+ranksep:180
 
-            position:{
-              x:index*180,
-              y:150
-            },
+});
 
-            data:{
-              label:n.label
-            }
+g.setDefaultEdgeLabel(
+()=>({})
+);
 
-          }));
+nodes.forEach(n=>{
 
-        const visualEdges =
-          data.edges.map((e,index)=>({
+g.setNode(
+n.id,
+{
+width:180,
+height:90
+}
+);
 
-            id:"e"+index,
+});
 
-            source:e.source,
+edges.forEach(e=>{
 
-            target:e.target,
+g.setEdge(
+e.source,
+e.target
+);
 
-            label:e.label
-          }));
+});
 
-        setNodes(visualNodes);
+dagre.layout(g);
 
-        setEdges(visualEdges);
+return nodes.map(n=>{
 
-      });
+const p=
+g.node(n.id);
 
-  },[]);
+return{
 
-  async function animatePacket(path){
+...n,
 
-    for(let node of path){
+position:{
+x:p.x,
+y:p.y
+}
 
-      setPacketNode(node);
+};
 
-      await new Promise(
-        r=>setTimeout(r,1000)
-      );
+});
 
-    }
+}
 
-  }
+function loadGraph(){
 
-  function highlightPath(path){
+fetch("/network.json")
 
-    const newEdges=
-      edges.map(e=>{
+.then(r=>r.json())
 
-        let active=false;
+.then(data=>{
 
-        for(
-          let i=0;
-          i<path.length-1;
-          i++
-        ){
+setRawEdges(
+data.edges
+);
 
-          let a=path[i];
+let ns=
+data.nodes.map(
+n=>({
 
-          let b=path[i+1];
+id:n.id,
 
-          if(
+data:{
+label:n.label
+},
 
-            (e.source===a &&
-             e.target===b)
+style:{
 
-            ||
+background:"#172554",
 
-            (e.source===b &&
-             e.target===a)
+color:"white",
 
-          ){
+border:
+"2px solid #38bdf8",
 
-            active=true;
+borderRadius:"18px",
 
-          }
+width:180,
 
-        }
+fontSize:"18px"
 
-        return{
+},
 
-          ...e,
+position:{
+x:0,
+y:0
+}
 
-          animated:active,
+})
 
-          style:active?
+);
 
-          {
-            stroke:"red",
-            strokeWidth:4
-          }
+let es=
+data.edges.map(
+(e,index)=>({
 
-          :{}
+id:"e"+index,
 
-        };
+source:e.source,
 
-      });
+target:e.target,
 
-    setEdges(newEdges);
+label:`${e.label}`,
 
-    animatePacket(path);
+labelStyle:{
+fill:"white",
+fontSize:16,
+fontWeight:700
+},
 
-  }
+labelBgStyle:{
+fill:"#0f172a"
+},
 
-  function runDijkstra(source,destination){
+type:"smoothstep"
 
-    let adj={};
+})
 
-    rawEdges.forEach(e=>{
+);
 
-      if(!adj[e.source])
-        adj[e.source]=[];
+ns=
+layoutGraph(
+ns,
+es
+);
 
-      if(!adj[e.target])
-        adj[e.target]=[];
+setNodes(ns);
 
-      adj[e.source].push({
-        node:e.target,
-        weight:Number(e.label)
-      });
+setEdges(es);
 
-      adj[e.target].push({
-        node:e.source,
-        weight:Number(e.label)
-      });
+});
 
-    });
+}
 
-    let dist={};
+async function animatePacket(path){
 
-    let parent={};
+for(let n of path){
 
-    nodes.forEach(n=>{
+setPacketNode(n);
 
-      dist[n.id]=Infinity;
+await new Promise(
+r=>
+setTimeout(
+r,
+700
+)
+);
 
-      parent[n.id]=null;
+}
 
-    });
+}
 
-    dist[source]=0;
+function routePacket(){
 
-    let pq=[[0,source]];
+if(
+!source ||
+!destination
+)
+return;
 
-    while(pq.length){
+let adj={};
 
-      pq.sort(
-        (a,b)=>a[0]-b[0]
-      );
+rawEdges.forEach(e=>{
 
-      let [d,u]=pq.shift();
+if(
+e.disabled
+)
+return;
 
-      if(!adj[u]) continue;
+if(
+!adj[e.source]
+)
+adj[e.source]=[];
 
-      adj[u].forEach(v=>{
+if(
+!adj[e.target]
+)
+adj[e.target]=[];
 
-        let nd=d+v.weight;
+adj[e.source].push({
 
-        if(
-          nd<dist[v.node]
-        ){
+node:e.target,
 
-          dist[v.node]=nd;
+weight:Number(
+e.label
+)
 
-          parent[v.node]=u;
+});
 
-          pq.push([
-            nd,
-            v.node
-          ]);
+adj[e.target].push({
 
-        }
+node:e.source,
 
-      });
+weight:Number(
+e.label
+)
 
-    }
+});
 
-    let path=[];
+});
 
-    let cur=destination;
+let dist={};
 
-    while(cur!==null){
+let parent={};
 
-      path.push(cur);
+let visited={};
 
-      cur=parent[cur];
+nodes.forEach(n=>{
 
-    }
+dist[n.id]=Infinity;
 
-    path.reverse();
+parent[n.id]=null;
 
-    highlightPath(path);
+visited[n.id]=false;
 
-  }
+});
 
-  function handleNodeClick(
-    event,
-    node
-  ){
+dist[source]=0;
 
-    let next=[
-      ...selected
-    ];
+while(true){
 
-    if(next.length===2)
-      next=[];
+let u=null;
 
-    next.push(node.id);
+let best=Infinity;
 
-    setSelected(next);
+Object.keys(dist)
+.forEach(k=>{
 
-    if(next.length===2){
+if(
+!visited[k] &&
+dist[k]<best
+){
 
-      runDijkstra(
-        next[0],
-        next[1]
-      );
+best=dist[k];
 
-    }
+u=k;
 
-  }
+}
 
-  const animatedNodes=
-    nodes.map(n=>({
+});
 
-      ...n,
+if(u===null)
+break;
 
-      data:{
+visited[u]=true;
 
-        label:
-          packetNode===n.id
+if(!adj[u])
+continue;
 
-          ?
+adj[u].forEach(v=>{
 
-          `📦 ${n.data.label}`
+let nd=
+dist[u]+
+v.weight;
 
-          :
+if(
+nd<
+dist[v.node]
+){
 
-          n.data.label
+dist[v.node]=nd;
 
-      }
+parent[v.node]=u;
 
-    }));
+}
 
-  return(
+});
 
-    <div
-      style={{
-        width:"100vw",
-        height:"100vh"
-      }}
-    >
+}
 
-      <div
-        style={{
-          position:"absolute",
+if(
+dist[destination]
+===Infinity
+){
 
-          zIndex:10,
+setRoute([
+"No Route Found"
+]);
 
-          background:"white",
+setDistance(
+"-"
+);
 
-          padding:"10px"
-        }}
-      >
+return;
 
-        Route:
+}
 
-        {selected.join(
-          " → "
-        )}
+setDistance(
+dist[destination]
+);
 
-      </div>
+let path=[];
 
-      <ReactFlow
+let cur=
+destination;
 
-        nodes={
-          animatedNodes
-        }
+while(
+cur!==null
+){
 
-        edges={edges}
+path.unshift(
+cur
+);
 
-        fitView
+cur=
+parent[cur];
 
-        onNodeClick={
-          handleNodeClick
-        }
+}
 
-      />
+setRoute(path);
 
-    </div>
+animatePacket(path);
 
-  );
+const updated=
+edges.map(e=>{
+
+let active=
+false;
+
+for(
+let i=0;
+i<path.length-1;
+i++
+){
+
+let a=
+path[i];
+
+let b=
+path[i+1];
+
+if(
+
+(e.source===a &&
+e.target===b)
+
+||
+
+(e.source===b &&
+e.target===a)
+
+)
+
+active=true;
+
+}
+
+return{
+
+...e,
+
+animated:
+active,
+
+style:
+
+active
+
+?
+
+{
+
+stroke:
+"#22c55e",
+
+strokeWidth:
+5
+
+}
+
+:
+
+e.style || {}
+
+};
+
+});
+
+setEdges(
+updated
+);
+
+}
+
+function disableLink(){
+
+if(
+!failedEdge
+)
+return;
+
+let [a,b]=
+failedEdge.split(
+"-"
+);
+
+setRawEdges(
+
+rawEdges.map(
+e=>{
+
+if(
+
+(e.source===a &&
+e.target===b)
+
+||
+
+(e.source===b &&
+e.target===a)
+
+)
+
+return{
+
+...e,
+
+disabled:true
+
+};
+
+return e;
+
+}
+
+)
+
+);
+
+setEdges(
+
+edges.map(e=>{
+
+if(
+
+(e.source===a &&
+e.target===b)
+
+||
+
+(e.source===b &&
+e.target===a)
+
+)
+
+return{
+
+...e,
+
+style:{
+
+stroke:"#6b7280",
+
+strokeDasharray:
+"8 8",
+
+strokeWidth:4
+
+}
+
+};
+
+return e;
+
+})
+
+);
+
+setTimeout(
+()=>routePacket(),
+100
+);
+
+}
+
+const displayNodes=
+nodes.map(n=>({
+
+...n,
+
+data:{
+
+label:
+
+packetNode===n.id
+
+?
+
+`📦 ${n.data.label}`
+
+:
+
+n.data.label
+
+}
+
+}));
+
+return(
+
+<div
+style={{
+width:"100vw",
+height:"100vh"
+}}
+>
+
+<div
+style={{
+
+position:"absolute",
+
+top:25,
+
+left:25,
+
+zIndex:100,
+
+width:340,
+
+background:
+"rgba(15,23,42,.92)",
+
+padding:20,
+
+borderRadius:18,
+
+color:"white"
+
+}}
+>
+
+<h2>
+Network Control
+</h2>
+
+<p>Source</p>
+
+<select
+value={source}
+onChange={e=>
+setSource(
+e.target.value
+)}
+>
+<option/>
+{
+nodes.map(n=>
+
+<option
+key={n.id}
+>
+
+{n.id}
+
+</option>
+
+)
+}
+</select>
+
+<p>
+Destination
+</p>
+
+<select
+value={destination}
+onChange={e=>
+setDestination(
+e.target.value
+)}
+>
+<option/>
+{
+nodes.map(n=>
+
+<option
+key={n.id}
+>
+
+{n.id}
+
+</option>
+
+)
+}
+</select>
+
+<br/><br/>
+
+<button
+onClick={
+routePacket
+}
+>
+
+Route Packet
+
+</button>
+
+<hr/>
+
+<p>
+Fail Link
+</p>
+
+<select
+value={failedEdge}
+onChange={e=>
+setFailedEdge(
+e.target.value
+)}
+>
+
+<option/>
+
+{
+
+rawEdges
+.filter(
+e=>
+e.disabled!==true
+)
+
+.map(
+e=>
+
+<option>
+
+{e.source}
+-
+{e.target}
+
+</option>
+
+)
+
+}
+
+</select>
+
+<br/><br/>
+
+<button
+onClick={
+disableLink
+}
+>
+
+Disable Link
+
+</button>
+
+<hr/>
+
+Route:
+
+{
+route.join(
+" → "
+)
+}
+
+<br/><br/>
+
+Distance:
+
+{
+distance
+}
+
+</div>
+
+<ReactFlow
+
+nodes={
+displayNodes
+}
+
+edges={
+edges
+}
+
+fitView
+
+fitViewOptions={{
+padding:.35
+}}
+
+>
+
+<MiniMap/>
+
+<Controls/>
+
+<Background/>
+
+</ReactFlow>
+
+</div>
+
+);
 
 }
