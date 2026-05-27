@@ -27,6 +27,23 @@ const [distance,setDistance]=useState("-");
 
 const [failedEdge,setFailedEdge]=useState("");
 
+const [hopCount,setHopCount]=useState(0);
+
+const [
+deliveredPackets,
+setDeliveredPackets
+]=useState(0);
+
+const [
+failedPackets,
+setFailedPackets
+]=useState(0);
+
+const [
+routingTable,
+setRoutingTable
+]=useState([]);
+
 useEffect(()=>{
 loadGraph();
 },[]);
@@ -151,12 +168,16 @@ source:e.source,
 
 target:e.target,
 
-label:`${e.label}`,
+label:e.label,
 
 labelStyle:{
+
 fill:"white",
+
 fontSize:16,
+
 fontWeight:700
+
 },
 
 labelBgStyle:{
@@ -198,6 +219,74 @@ r,
 );
 
 }
+
+}
+
+function updateVisualEdges(data){
+
+const updated=
+
+edges.map(e=>{
+
+const match=
+
+data.find(
+x=>
+
+(
+
+x.source===e.source &&
+x.target===e.target
+
+)
+
+||
+
+(
+
+x.source===e.target &&
+x.target===e.source
+
+)
+
+);
+
+if(
+match?.disabled
+)
+
+return{
+
+...e,
+
+animated:false,
+
+style:{
+
+stroke:"#6b7280",
+
+strokeDasharray:
+"8 8",
+
+strokeWidth:4
+
+}
+
+};
+
+return{
+
+...e,
+
+style:{}
+
+};
+
+});
+
+setEdges(
+updated
+);
 
 }
 
@@ -254,54 +343,51 @@ let dist={};
 
 let parent={};
 
-let visited={};
-
 nodes.forEach(n=>{
 
 dist[n.id]=Infinity;
 
 parent[n.id]=null;
 
-visited[n.id]=false;
-
 });
 
 dist[source]=0;
 
-while(true){
+let pq=[
+[0,source]
+];
 
-let u=null;
-
-let best=Infinity;
-
-Object.keys(dist)
-.forEach(k=>{
-
-if(
-!visited[k] &&
-dist[k]<best
+while(
+pq.length
 ){
 
-best=dist[k];
+pq.sort(
+(a,b)=>
+a[0]-b[0]
+);
 
-u=k;
+const [
+curDist,
+u
+]=pq.shift();
 
-}
+if(
+curDist>
+dist[u]
+)
+continue;
 
-});
-
-if(u===null)
-break;
-
-visited[u]=true;
-
-if(!adj[u])
+if(
+!adj[u]
+)
 continue;
 
 adj[u].forEach(v=>{
 
-let nd=
-dist[u]+
+const nd=
+
+curDist+
+
 v.weight;
 
 if(
@@ -309,9 +395,18 @@ nd<
 dist[v.node]
 ){
 
-dist[v.node]=nd;
+dist[
+v.node
+]=nd;
 
-parent[v.node]=u;
+parent[
+v.node
+]=u;
+
+pq.push([
+nd,
+v.node
+]);
 
 }
 
@@ -328,8 +423,10 @@ setRoute([
 "No Route Found"
 ]);
 
-setDistance(
-"-"
+setDistance("-");
+
+setFailedPackets(
+x=>x+1
 );
 
 return;
@@ -360,9 +457,33 @@ parent[cur];
 
 setRoute(path);
 
+setHopCount(
+path.length-1
+);
+
+setDeliveredPackets(
+x=>x+1
+);
+
+setRoutingTable(
+
+path.map(
+(node,index)=>({
+
+hop:index,
+
+router:node
+
+})
+
+)
+
+);
+
 animatePacket(path);
 
 const updated=
+
 edges.map(e=>{
 
 let active=
@@ -374,10 +495,10 @@ i<path.length-1;
 i++
 ){
 
-let a=
+const a=
 path[i];
 
-let b=
+const b=
 path[i+1];
 
 if(
@@ -435,9 +556,7 @@ updated
 
 function disableLink(){
 
-if(
-!failedEdge
-)
+if(!failedEdge)
 return;
 
 let [a,b]=
@@ -445,7 +564,7 @@ failedEdge.split(
 "-"
 );
 
-setRawEdges(
+const updated=
 
 rawEdges.map(
 e=>{
@@ -474,13 +593,37 @@ return e;
 
 }
 
-)
-
 );
 
-setEdges(
+setRawEdges(
+updated
+);
 
-edges.map(e=>{
+updateVisualEdges(
+updated
+);
+
+setTimeout(
+()=>routePacket(),
+100
+);
+
+}
+
+function restoreLink(){
+
+if(!failedEdge)
+return;
+
+let [a,b]=
+failedEdge.split(
+"-"
+);
+
+const updated=
+
+rawEdges.map(
+e=>{
 
 if(
 
@@ -498,29 +641,64 @@ return{
 
 ...e,
 
-style:{
-
-stroke:"#6b7280",
-
-strokeDasharray:
-"8 8",
-
-strokeWidth:4
-
-}
+disabled:false
 
 };
 
 return e;
 
-})
+}
 
+);
+
+setRawEdges(
+updated
+);
+
+updateVisualEdges(
+updated
 );
 
 setTimeout(
 ()=>routePacket(),
 100
 );
+
+}
+
+function resetNetwork(){
+
+const updated=
+
+rawEdges.map(
+e=>({
+
+...e,
+
+disabled:false
+
+})
+
+);
+
+setRawEdges(
+updated
+);
+
+updateVisualEdges(
+updated);
+
+setRoute([]);
+
+setDistance("-");
+
+setHopCount(0);
+
+setPacketNode(
+null
+);
+
+setRoutingTable([]);
 
 }
 
@@ -567,7 +745,7 @@ left:25,
 
 zIndex:100,
 
-width:340,
+width:360,
 
 background:
 "rgba(15,23,42,.92)",
@@ -594,7 +772,9 @@ setSource(
 e.target.value
 )}
 >
+
 <option/>
+
 {
 nodes.map(n=>
 
@@ -608,6 +788,7 @@ key={n.id}
 
 )
 }
+
 </select>
 
 <p>
@@ -621,7 +802,9 @@ setDestination(
 e.target.value
 )}
 >
+
 <option/>
+
 {
 nodes.map(n=>
 
@@ -635,6 +818,7 @@ key={n.id}
 
 )
 }
+
 </select>
 
 <br/><br/>
@@ -652,7 +836,7 @@ Route Packet
 <hr/>
 
 <p>
-Fail Link
+Link Control
 </p>
 
 <select
@@ -666,14 +850,7 @@ e.target.value
 <option/>
 
 {
-
-rawEdges
-.filter(
-e=>
-e.disabled!==true
-)
-
-.map(
+rawEdges.map(
 e=>
 
 <option>
@@ -685,27 +862,27 @@ e=>
 </option>
 
 )
-
 }
 
 </select>
 
 <br/><br/>
 
-<button
-onClick={
-disableLink
-}
->
+<button onClick={disableLink}>
+Disable
+</button>
 
-Disable Link
+<button onClick={restoreLink}>
+Restore
+</button>
 
+<button onClick={resetNetwork}>
+Reset
 </button>
 
 <hr/>
 
 Route:
-
 {
 route.join(
 " → "
@@ -715,9 +892,57 @@ route.join(
 <br/><br/>
 
 Distance:
+{distance}
+
+<br/>
+
+Hop Count:
+{hopCount}
+
+<hr/>
+
+Delivered:
+{deliveredPackets}
+
+<br/>
+
+Failed:
+{failedPackets}
+
+<br/>
+
+Active Links:
 
 {
-distance
+rawEdges.filter(
+e=>
+!e.disabled
+).length
+}
+
+<hr/>
+
+Routing Table
+
+{
+
+routingTable.map(
+r=>
+
+<div>
+
+Hop {
+r.hop
+}
+
+→ Router {
+r.router
+}
+
+</div>
+
+)
+
 }
 
 </div>
