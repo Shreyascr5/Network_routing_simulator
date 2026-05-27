@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
-
 import dagre from "dagre";
 
 import {
-  ReactFlow,
-  Controls,
-  MiniMap,
-  Background
+ReactFlow,
+Controls,
+MiniMap,
+Background
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 
-export default function NetworkGraph() {
+export default function NetworkGraph(){
 
 const [nodes,setNodes]=useState([]);
 const [edges,setEdges]=useState([]);
@@ -27,26 +26,34 @@ const [distance,setDistance]=useState("-");
 
 const [failedEdge,setFailedEdge]=useState("");
 
+const [selectedLink,setSelectedLink]=useState("");
+const [newWeight,setNewWeight]=useState("");
+
 const [hopCount,setHopCount]=useState(0);
 
-const [
-deliveredPackets,
-setDeliveredPackets
-]=useState(0);
+const [delivered,setDelivered]=useState(0);
 
-const [
-failedPackets,
-setFailedPackets
-]=useState(0);
+const [failed,setFailed]=useState(0);
 
-const [
-routingTable,
-setRoutingTable
-]=useState([]);
+const [routingTable,setRoutingTable]=useState([]);
 
 useEffect(()=>{
 loadGraph();
 },[]);
+
+function edgeColor(w){
+
+w=Number(w);
+
+if(w>=8)
+return "#ef4444";
+
+if(w>=4)
+return "#eab308";
+
+return "#22c55e";
+
+}
 
 function layoutGraph(nodes,edges){
 
@@ -57,9 +64,9 @@ g.setGraph({
 
 rankdir:"LR",
 
-nodesep:120,
+nodesep:150,
 
-ranksep:180
+ranksep:200
 
 });
 
@@ -100,8 +107,11 @@ return{
 ...n,
 
 position:{
+
 x:p.x,
+
 y:p.y
+
 }
 
 };
@@ -122,7 +132,8 @@ setRawEdges(
 data.edges
 );
 
-let ns=
+const ns=
+
 data.nodes.map(
 n=>({
 
@@ -143,9 +154,7 @@ border:
 
 borderRadius:"18px",
 
-width:180,
-
-fontSize:"18px"
+width:180
 
 },
 
@@ -158,7 +167,8 @@ y:0
 
 );
 
-let es=
+const es=
+
 data.edges.map(
 (e,index)=>({
 
@@ -174,8 +184,6 @@ labelStyle:{
 
 fill:"white",
 
-fontSize:16,
-
 fontWeight:700
 
 },
@@ -184,19 +192,29 @@ labelBgStyle:{
 fill:"#0f172a"
 },
 
+style:{
+
+stroke:
+edgeColor(
+e.label
+),
+
+strokeWidth:3
+
+},
+
 type:"smoothstep"
 
 })
 
 );
 
-ns=
+setNodes(
 layoutGraph(
 ns,
 es
+)
 );
-
-setNodes(ns);
 
 setEdges(es);
 
@@ -219,74 +237,6 @@ r,
 );
 
 }
-
-}
-
-function updateVisualEdges(data){
-
-const updated=
-
-edges.map(e=>{
-
-const match=
-
-data.find(
-x=>
-
-(
-
-x.source===e.source &&
-x.target===e.target
-
-)
-
-||
-
-(
-
-x.source===e.target &&
-x.target===e.source
-
-)
-
-);
-
-if(
-match?.disabled
-)
-
-return{
-
-...e,
-
-animated:false,
-
-style:{
-
-stroke:"#6b7280",
-
-strokeDasharray:
-"8 8",
-
-strokeWidth:4
-
-}
-
-};
-
-return{
-
-...e,
-
-style:{}
-
-};
-
-});
-
-setEdges(
-updated
-);
 
 }
 
@@ -419,15 +369,13 @@ dist[destination]
 ===Infinity
 ){
 
+setFailed(
+x=>x+1
+);
+
 setRoute([
 "No Route Found"
 ]);
-
-setDistance("-");
-
-setFailedPackets(
-x=>x+1
-);
 
 return;
 
@@ -461,7 +409,7 @@ setHopCount(
 path.length-1
 );
 
-setDeliveredPackets(
+setDelivered(
 x=>x+1
 );
 
@@ -482,7 +430,7 @@ router:node
 
 animatePacket(path);
 
-const updated=
+setEdges(
 
 edges.map(e=>{
 
@@ -532,24 +480,20 @@ active
 
 {
 
-stroke:
-"#22c55e",
+stroke:"#22c55e",
 
-strokeWidth:
-5
+strokeWidth:5
 
 }
 
 :
 
-e.style || {}
+e.style
 
 };
 
-});
+})
 
-setEdges(
-updated
 );
 
 }
@@ -564,7 +508,7 @@ failedEdge.split(
 "-"
 );
 
-const updated=
+setRawEdges(
 
 rawEdges.map(
 e=>{
@@ -591,20 +535,12 @@ disabled:true
 
 return e;
 
-}
+})
 
-);
-
-setRawEdges(
-updated
-);
-
-updateVisualEdges(
-updated
 );
 
 setTimeout(
-()=>routePacket(),
+routePacket,
 100
 );
 
@@ -620,7 +556,7 @@ failedEdge.split(
 "-"
 );
 
-const updated=
+setRawEdges(
 
 rawEdges.map(
 e=>{
@@ -647,28 +583,15 @@ disabled:false
 
 return e;
 
-}
+})
 
-);
-
-setRawEdges(
-updated
-);
-
-updateVisualEdges(
-updated
-);
-
-setTimeout(
-()=>routePacket(),
-100
 );
 
 }
 
 function resetNetwork(){
 
-const updated=
+setRawEdges(
 
 rawEdges.map(
 e=>({
@@ -679,14 +602,9 @@ disabled:false
 
 })
 
-);
+)
 
-setRawEdges(
-updated
 );
-
-updateVisualEdges(
-updated);
 
 setRoute([]);
 
@@ -694,15 +612,109 @@ setDistance("-");
 
 setHopCount(0);
 
-setPacketNode(
-null
+}
+
+function updateLatency(){
+
+if(
+!selectedLink ||
+!newWeight
+)
+return;
+
+let [a,b]=
+selectedLink.split(
+"-"
 );
 
-setRoutingTable([]);
+const updated=
+
+rawEdges.map(
+e=>{
+
+if(
+
+(e.source===a &&
+e.target===b)
+
+||
+
+(e.source===b &&
+e.target===a)
+
+)
+
+return{
+
+...e,
+
+label:
+Number(
+newWeight
+)
+
+};
+
+return e;
+
+}
+
+);
+
+setRawEdges(
+updated
+);
+
+setEdges(
+
+edges.map(e=>{
+
+if(
+
+(e.source===a &&
+e.target===b)
+
+||
+
+(e.source===b &&
+e.target===a)
+
+)
+
+return{
+
+...e,
+
+label:newWeight,
+
+style:{
+
+stroke:
+edgeColor(
+newWeight
+),
+
+strokeWidth:4
+
+}
+
+};
+
+return e;
+
+})
+
+);
+
+setTimeout(
+routePacket,
+100
+);
 
 }
 
 const displayNodes=
+
 nodes.map(n=>({
 
 ...n,
@@ -739,31 +751,29 @@ style={{
 
 position:"absolute",
 
-top:25,
+left:20,
 
-left:25,
-
-zIndex:100,
+top:20,
 
 width:360,
 
+zIndex:100,
+
 background:
-"rgba(15,23,42,.92)",
+"rgba(15,23,42,.95)",
 
 padding:20,
 
-borderRadius:18,
+borderRadius:20,
 
 color:"white"
 
 }}
 >
 
-<h2>
-Network Control
-</h2>
-
-<p>Source</p>
+<h1>
+Network Dashboard
+</h1>
 
 <select
 value={source}
@@ -772,28 +782,17 @@ setSource(
 e.target.value
 )}
 >
-
 <option/>
-
 {
 nodes.map(n=>
 
-<option
-key={n.id}
->
-
+<option key={n.id}>
 {n.id}
-
 </option>
 
 )
 }
-
 </select>
-
-<p>
-Destination
-</p>
 
 <select
 value={destination}
@@ -802,42 +801,23 @@ setDestination(
 e.target.value
 )}
 >
-
 <option/>
-
 {
 nodes.map(n=>
 
-<option
-key={n.id}
->
-
+<option key={n.id}>
 {n.id}
-
 </option>
 
 )
 }
-
 </select>
 
-<br/><br/>
-
-<button
-onClick={
-routePacket
-}
->
-
+<button onClick={routePacket}>
 Route Packet
-
 </button>
 
 <hr/>
-
-<p>
-Link Control
-</p>
 
 <select
 value={failedEdge}
@@ -866,8 +846,6 @@ e=>
 
 </select>
 
-<br/><br/>
-
 <button onClick={disableLink}>
 Disable
 </button>
@@ -882,14 +860,56 @@ Reset
 
 <hr/>
 
-Route:
+<h3>
+Latency Control
+</h3>
+
+<select
+value={selectedLink}
+onChange={e=>
+setSelectedLink(
+e.target.value
+)}
+>
+
+<option/>
+
 {
-route.join(
-" → "
+rawEdges.map(
+e=>
+
+<option>
+
+{e.source}
+-
+{e.target}
+
+</option>
+
 )
 }
 
-<br/><br/>
+</select>
+
+<input
+value={newWeight}
+onChange={e=>
+setNewWeight(
+e.target.value
+)}
+placeholder="Latency"
+/>
+
+<button onClick={updateLatency}>
+Update
+</button>
+
+<hr/>
+
+Route:
+{route.join(" → ")}
+
+<br/>
 
 Distance:
 {distance}
@@ -902,60 +922,45 @@ Hop Count:
 <hr/>
 
 Delivered:
-{deliveredPackets}
+{delivered}
 
 <br/>
 
 Failed:
-{failedPackets}
-
-<br/>
-
-Active Links:
-
-{
-rawEdges.filter(
-e=>
-!e.disabled
-).length
-}
+{failed}
 
 <hr/>
 
 Routing Table
 
 {
-
 routingTable.map(
 r=>
 
-<div>
+<div key={r.hop}>
 
-Hop {
-r.hop
-}
-
-→ Router {
-r.router
-}
+Hop {r.hop}
+→ Router {r.router}
 
 </div>
 
 )
-
 }
 
 </div>
 
+<div
+style={{
+marginLeft:"420px",
+height:"100vh"
+}}
+>
+
 <ReactFlow
 
-nodes={
-displayNodes
-}
+nodes={displayNodes}
 
-edges={
-edges
-}
+edges={edges}
 
 fitView
 
@@ -972,6 +977,8 @@ padding:.35
 <Background/>
 
 </ReactFlow>
+
+</div>
 
 </div>
 
